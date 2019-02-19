@@ -1,0 +1,211 @@
+---
+title: "Introduction to pliable"
+author: "Rob Tibshirani"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to pliable}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+`pliable` is a package that fits the pliable lasso, a new method for obtaining sparse models for supervised learning problems. The
+     pliable lasso 
+takes as input the usual feature matrix X and response y , but   also a  matrix of modifying variables Z. These variables may be continuous or categorical.
+     The pliable lasso model is a generalization of the lasso in which the
+     coefficients multiplying the features X are allowed to vary as a
+     function of the modifying variables Z. 
+
+
+We introduce some notation that we will use throughout this vignette. Let there be $n$ observations, each with feature vector $x_i \in \mathbb{R}^p$ and response $y_i$. Let $X \in \mathbb{R}^{n \times p}$ denote the overall feature matrix, and let $y \in \mathbb{R}^n$ denote the vector of responses. Finally, let $Z \in \mathbb{R}^{n \times nz}$ denote the matrix of modifying variables.
+
+`pliable` fits the model
+
+<p align="center">
+$$ \hat y  = \beta_0+ Z\theta_0+ \sum_j X_j(\beta_j + Z\theta_j)$$
+
+</p>
+where $X_j$ is the $j$th column of $X$. Here each $\beta_j$ is a scalar and each
+$\theta_j$ is a vector of length $nz$. The model is fit with penalties that
+encourage both $\beta=(\beta_1, \ldots \beta_p)$ and each $\theta_j$ to be sparse,
+and also a hierarchy constraint that allows $\theta_j$ to be non-zero only if $\beta_j$
+is non zero. Note that each $\theta_j$ represents an interaction between $X_j$ and all of
+$Z$. Details of the optimization may be found in the paper by Tibshirani
+and Friedman [arXiv](https://arxiv.org/abs/1712.00484).	
+
+
+`pliable` uses cyclical coordinate descent, which successively optimizes the objective function over each parameter with all other parameters fixed, cycling repeatedly until convergence.  The interaction terms $\theta_j$ are estimated by proximal gradient
+descent.
+
+The package also includes methods for prediction and plotting, and a function which performs $k$-fold cross-validation.
+
+## Installation
+
+We begin by installing `pliable` from CRAN. Type the following command in R console:
+```{r eval=FALSE}
+install.packages("pliable")
+```
+
+This command downloads the R package and installs it to the default directories. Users may change add a `repos` option to the function call to specify which repository to download from, depending on their locations and preferences.
+
+Alternatively, users can download the package source at CRAN and type Unix commands to install it to the desired location.
+
+## Quick Start
+
+The purpose of this section is to give users a general sense of the package. We will briefly go over the main functions of the package, as well as some key options. More details are given in later sections.
+
+First, we load the `pliable` package:
+```{r}
+library(pliable)
+```
+
+Let's generate some data:
+```{r}
+set.seed(944)
+n = 50; p = 10 ;nz=5
+x = matrix(rnorm(n*p), n, p)
+mx=colMeans(x)
+sx=sqrt(apply(x,2,var))
+x=scale(x,mx,sx) 
+z =matrix(rnorm(n*nz),n,nz)
+mz=colMeans(z)
+sz=sqrt(apply(z,2,var))
+z=scale(z,mz,sz)
+y =4*x[,1] +5*x[,1]*z[,3]+ 3*rnorm(n)
+```
+
+We recommend that the columns of both $X$ and $Z$ be standardized, before running `pliable`, as we have done above.
+
+We fit the model using the most basic call to `pliable`:
+```{r results="hide"}
+fit <- pliable(x,z,y)
+```
+
+
+The function `pliable` returns a `pliable` object. We can examine the results
+```{r}
+
+fit
+
+```
+For each model in the solution path indexed by $\lambda$, the table shows the % Deviance explained, number of main effects (non-zero $\hat\beta_j$s) , number of main effects with interactions  (number of $\hat\theta_j$ vectors that have at least one zero component)  and the number of non-zero interactions (non-zero $\hat\theta_{jk}$ values.)
+We can plot the path of coefficients
+```{r}
+plot(fit)
+```
+
+And we can make predictions using a `pliable` object by calling the `predict` method. Each column gives the predictions for one value of `lambda`.
+Here we choose the 20th value:
+```{r}
+# get predictions for 20th model
+predict(fit, x[1:5, ],z[1:5,])[,20]
+```
+
+### Cross-validation (CV)
+
+We can perform $k$-fold cross-validation (CV) with `cv.pliable`. It does 10-fold cross-validation by default:
+```{r results="hide"}
+cvfit <- cv.pliable(fit,x, z, y)
+```
+
+We can change the number of folds using the `nfolds` option:
+```{r results="hide"}
+cvfit <- cv.pliable(fit, x, z,y , nfolds = 5)
+```
+
+If we want to specify which observation belongs to which fold, we can do that by specifying the `foldid` option, which is a vector of length $n$, with the $i$th element being the fold number for observation $i$.
+```{r results="hide"}
+foldid <- sample(rep(seq(5), length = n))
+cvfit <- cv.pliable(fit, x,z,y, foldid = foldid)
+```
+
+A `cv.pliable` call returns a `cv.pliable` object. We can plot this object to get the CV curve with error bars (one standard error in each direction). The left vertical dotted line represents `lambda.min`, the `lambda` value which attains minimum CV error, while the right vertical dotted line represents `lambda.1se`, the largest `lambda` value with CV error within one standard error of the minimum CV error.
+```{r fig.width=5, fig.height=4}
+plot(cvfit)
+```
+
+
+The two special `lambda` values can be extracted directly from the `cv.pliable` object as well:
+```{r}
+cvfit$lambda.min
+cvfit$lambda.1se
+```
+
+Predictions can be made from  the fitted `cv.pliable` object. By default, predictions are given for `lambda` being equal to `lambda.1se`. To get predictions are `lambda.min`, set `s = "lambda.min"`.
+```{r}
+set.seed(44)
+ntest=500
+xtest = matrix(rnorm(ntest*p),ntest,p)
+xtest=scale(xtest,mx,sx) 
+ztest =matrix(rnorm(ntest*nz),ntest,nz)
+ztest=scale(ztest,mz,sz) 
+ytest = 4*xtest[,1] +5*xtest[,1]*ztest[,3]+ 3*rnorm(ntest)
+pred= predict(fit,xtest,ztest,lambda=cvfit$lambda.min)
+plot(ytest,pred)
+
+```
+
+### Categorical Z
+
+If $Z$ is categorical, you much first convert it to  set of dummy variables
+(``one-hot encoding''). Suppose that that you have two $Z$ variables, a categorical one
+$Z1= (3,1,4,2,2,1,3)$ and a quantitative variable $Z2$.
+Then you would convert $Z1$ to dummy variables, using say $D=model.matrix(~Z)$
+and then define $Z$ as $Z <- cbind(D,Z2)$
+
+
+### Z not observed in test set
+Here is an example where Z is not observed in the test set, but predicted
+    from a supervised learning algorithm
+
+```{r}
+ n = 50; p = 10 ;nz=5
+ x = matrix(rnorm(n*p), n, p)
+ mx=colMeans(x)
+
+ sx=sqrt(apply(x,2,var))
+ x=scale(x,mx,sx) 
+ z =matrix(rnorm(n*nz),n,nz)
+ mz=colMeans(z)
+ sz=sqrt(apply(z,2,var))
+ z=scale(z,mz,sz)
+ y =4*x[,1] +5*x[,1]*z[,3]+ 3*rnorm(n)
+ 
+ fit = pliable(x,z,y)
+ # predict z  from x; here we use glmnet, but any other supervised method can be used
+ 
+ zfit=cv.glmnet(x,z,family="mgaussian")
+ 
+ # Predict using the fitted model
+ ntest=500
+ xtest =matrix(rnorm(ntest*nz),ntest,p)
+ xtest=scale(xtest,mx,sx) 
+ ztest =predict(zfit,xtest,s=cvfit$lambda.min)[,,1]
+ ytest = 4*xtest[,1] +5*xtest[,1]*ztest[,3]+ 3*rnorm(ntest)
+ 
+ pred= predict(fit,xtest,ztest)
+```
+
+## Other options
+
+Here are some other options that one may specify for the `pliable` and `cv.pliable` functions:
+
+-   `w`: The user can pass a vector of length $n$ representing observation weights. The squared residual of the observations are weighted according to this vector. By default, this is set to 1 for all observations. 
+
+-   `family`: The default value for the `family` option of the `pliable` and `cv.pliable` functions is `gaussian`. Use this default when `y` is a quantitative variable (i.e. takes values along the real number line). 
+    For binary prediction, use `family = binomial`. In this setting, the response `y` should be a numeric vector containing just 0s and 1s.
+  
+-   `lambda`: The `lambda` sequence at which the model fit will be computed. This is typically not provided by the user: the program can construct the sequence on its own. When automatically generated, the `lambda` sequence is determined by `lambda.max` (internally computed) and `lambda.min.ratio`. (`lambda.min.ratio` is the ratio of smallest value of the generated `lambda` sequence, say `lambda.min`, to `lambda.max`.) The program generates `nlam` values (default is 50) linear on the log scale from `lambda.max` down to `lambda.min`.
+
+-   `standardize`: If set to `TRUE`, the columns of the feature matrix `x` are scaled to have unit variance before the algorithm is run.
+
+For more information, type `?pliable` or `?cv.pliable`.

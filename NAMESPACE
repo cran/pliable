@@ -1,0 +1,25 @@
+useDynLib("pliable")
+importFrom(utils,head,tail,packageDescription)
+
+importFrom("graphics", "abline", "axis", "plot", "segments","lines")
+
+importFrom("stats", "lm", "predict", "sd")
+
+ importFrom("graphics", "matplot", "points", "text")
+  importFrom("stats", "approx", "lsfit", "quantile", "var")
+
+import("glmnet")
+import("class")
+
+
+S3method(print,pliable)
+S3method(plot,pliable)
+S3method(plot,cv.pliable)
+S3method(coef,pliable)
+S3method(predict,pliable)
+
+
+export(pliable)
+export(cv.pliable)
+export(predict.pliable)
+export(coef.pliable)
