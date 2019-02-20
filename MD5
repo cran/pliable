@@ -1,11 +1,11 @@
-f002b478d7365c5266f5437e2f6696be *DESCRIPTION
+4af161ecb6b0ff8e5c774f5fc325da2a *DESCRIPTION
 6efe7b3729bd808c25288cff3a91626f *NAMESPACE
 b15f5d91f438e1ef073afe5c3e06129b *R/funs.R
 3aa3d1d3ec8eabbc585967bd2797140d *R/helper.R
 8ddebead1104238970799ef5bb7f75af *build/vignette.rds
 8a60214e4f0a72bbeddd15e689693b8f *inst/doc/pliable.R
 4e46ea0492e0a99995371bafd08b9d68 *inst/doc/pliable.Rmd
-c04a64a4e4901eac475cfe565be19412 *inst/doc/pliable.html
+7444b6f74bbe70f2e47045f93f768b46 *inst/doc/pliable.html
 a0f02b7a5347fecbca6a321ace75d0e4 *inst/mortran/logpliable.m
 2bf455b07210192333b59b85470e23f7 *inst/mortran/pliable.m
 bf0e14275d13dbd35de29073f688a1b9 *man/coef.pliable.Rd
